@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
-FILE_NAME="timeTracker.csv"
-FILE_PATH="."
+FILE_NAME="log.csv"
+FILE_PATH="$HOME/timeTracker"
 FILE="${FILE_PATH}/${FILE_NAME}"
 
 usage() {
   echo "Usage:"
-  echo "  timeTracker.sh                                      # read: print sum"
-  echo "  timeTracker.sh <float> [note] [--offset=<days>] [--date=YYYY-MM-DD]"
+  echo "  timeTracker.sh                                          # read: print sum"
+  echo "  timeTracker.sh <float> [--offset=<days>] [--date=YYYY-MM-DD] [--note=<string>]"
   exit 1
 }
 
@@ -25,6 +25,7 @@ if [[ $# -eq 0 ]]; then
       if (val ~ /^-?[0-9]+(\.[0-9]+)?$/) sum += val
     }
     END {
+      # Strip trailing zeros and unnecessary decimal point
       result = sprintf("%.2f", sum)
       sub(/\.?0+$/, "", result)
       print result
@@ -51,20 +52,15 @@ if ! echo "$time_val" | grep -qE '^-?[0-9]+(\.[0-9]+)?$'; then
   usage
 fi
 
-# Second arg is optional note (if it doesn't start with --)
-note=""
-if [[ -n "$1" && "$1" != --* ]]; then
-  note="$1"
-  shift
-fi
-
 offset=""
 date_val=""
+note=""
 
 for arg in "$@"; do
   case "$arg" in
     --offset=*)  offset="${arg#--offset=}" ;;
     --date=*)    date_val="${arg#--date=}" ;;
+    --note=*)    note="${arg#--note=}" ;;
     *) echo "Error: unknown argument '$arg'" >&2; usage ;;
   esac
 done
