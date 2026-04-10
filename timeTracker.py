@@ -29,7 +29,7 @@ def ensure_file():
 
 def build_parser():
     parser = argparse.ArgumentParser(prog=PROG_NAME)
-    subparsers = parser.add_subparsers(dest=DEST_COMMAND, required=True)
+    subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser(CMD_READ, help="Print the total sum of logged time")
 
@@ -94,9 +94,9 @@ def cmd_write(args):
 def main():
     args = build_parser().parse_args()
 
-    if getattr(args, DEST_COMMAND) == CMD_READ:
+    if args.command == CMD_READ:
         cmd_read(args)
-    elif getattr(args, DEST_COMMAND) == CMD_WRITE:
+    elif args.command == CMD_WRITE:
         cmd_write(args)
 
 
