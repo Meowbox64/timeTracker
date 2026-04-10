@@ -9,6 +9,16 @@ from pathlib import Path
 FILE_PATH = Path.home() / "timeTracker" / "log.csv"
 HEADER = ["Date", "Time", "Notes"]
 
+PROG_NAME = "timeTracker"
+
+CMD_READ = "read"
+CMD_WRITE = "write"
+
+OPT_VALUE = "value"
+OPT_OFFSET = "offset"
+OPT_DATE = "date"
+OPT_NOTE = "note"
+
 
 def ensure_file():
     FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -18,18 +28,18 @@ def ensure_file():
 
 
 def build_parser():
-    parser = argparse.ArgumentParser(prog="timeTracker")
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    parser = argparse.ArgumentParser(prog=PROG_NAME)
+    subparsers = parser.add_subparsers(dest=DEST_COMMAND, required=True)
 
-    subparsers.add_parser("read", help="Print the total sum of logged time")
+    subparsers.add_parser(CMD_READ, help="Print the total sum of logged time")
 
-    write_cmd = subparsers.add_parser("write", help="Log a time entry")
-    write_cmd.add_argument("value", type=float, help="Time value to log (can be negative)")
-    write_cmd.add_argument("--offset", type=int, default=None, metavar="DAYS",
+    write_cmd = subparsers.add_parser(CMD_WRITE, help="Log a time entry")
+    write_cmd.add_argument(OPT_VALUE, type=float, help="Time value to log (can be negative)")
+    write_cmd.add_argument(f"--{OPT_OFFSET}", type=int, default=None, metavar="DAYS",
                            help="Day offset from today (e.g. -1 for yesterday)")
-    write_cmd.add_argument("--date", default=None, metavar="YYYY-MM-DD",
+    write_cmd.add_argument(f"--{OPT_DATE}", default=None, metavar="YYYY-MM-DD",
                            help="Explicit date (overrides --offset)")
-    write_cmd.add_argument("--note", default="", help="Optional note for this entry")
+    write_cmd.add_argument(f"--{OPT_NOTE}", default="", help="Optional note for this entry")
 
     return parser
 
@@ -54,7 +64,7 @@ def resolve_date(date_str, offset):
         try:
             return date.fromisoformat(date_str)
         except ValueError:
-            sys.exit(f"Error: invalid --date value '{date_str}'")
+            sys.exit(f"Error: invalid --{OPT_DATE} value '{date_str}'")
     if offset is not None:
         return date.today() + timedelta(days=offset)
     return date.today()
@@ -74,18 +84,19 @@ def cmd_read(_args):
 
 
 def cmd_write(args):
-    resolved = resolve_date(args.date, args.offset)
-    append_entry(resolved, args.value, args.note)
-    note_part = f', "{args.note}"' if args.note else ""
-    print(f"Written: {resolved.isoformat()}, {args.value}{note_part}")
+    resolved = resolve_date(getattr(args, OPT_DATE), getattr(args, OPT_OFFSET))
+    note = getattr(args, OPT_NOTE)
+    append_entry(resolved, getattr(args, OPT_VALUE), note)
+    note_part = f', "{note}"' if note else ""
+    print(f"Written: {resolved.isoformat()}, {getattr(args, OPT_VALUE)}{note_part}")
 
 
 def main():
     args = build_parser().parse_args()
 
-    if args.command == "read":
+    if getattr(args, DEST_COMMAND) == CMD_READ:
         cmd_read(args)
-    elif args.command == "write":
+    elif getattr(args, DEST_COMMAND) == CMD_WRITE:
         cmd_write(args)
 
 
