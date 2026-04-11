@@ -15,6 +15,7 @@ PROG_NAME = "timeTracker"
 CMD_READ  = "read"
 CMD_WRITE = "write"
 CMD_GRAPH = "graph"
+CMD_LOG   = "log"
 
 OPT_VALUE  = "value"
 OPT_OFFSET = "offset"
@@ -22,6 +23,7 @@ OPT_DATE   = "date"
 OPT_NOTE   = "note"
 OPT_MODE   = "mode"
 OPT_SPAN   = "span"
+OPT_COUNT  = "count"
 
 
 class GraphMode(Enum):
@@ -31,6 +33,7 @@ class GraphMode(Enum):
 
 DEFAULT_GRAPH_MODE = GraphMode.TOTAL
 DEFAULT_GRAPH_SPAN = 30   # days back from today; graph shows span+1 columns
+DEFAULT_LOG_COUNT  = 10
 
 
 def ensure_file():
@@ -53,6 +56,12 @@ def build_parser():
     write_cmd.add_argument(f"--{OPT_DATE}", default=None, metavar="YYYY-MM-DD",
                            help="Explicit date (overrides --offset)")
     write_cmd.add_argument(f"--{OPT_NOTE}", default="", help="Optional note for this entry")
+
+    log_cmd = subparsers.add_parser(CMD_LOG, help="Display recent entries as a table")
+    log_cmd.add_argument(
+        OPT_COUNT, type=int, nargs="?", default=DEFAULT_LOG_COUNT, metavar="N",
+        help=f"Number of entries to show (default: {DEFAULT_LOG_COUNT})",
+    )
 
     graph_cmd = subparsers.add_parser(CMD_GRAPH, help="Display a bar graph of logged time")
     graph_cmd.add_argument(
@@ -99,6 +108,25 @@ def read_all_entries():
                 entries.append((
                     date.fromisoformat(row["Date"].strip()),
                     float(row["Time"].strip()),
+                ))
+            except (ValueError, KeyError):
+                pass
+    return entries
+
+
+def read_all_entries_full():
+    """Return all log entries as a list of (date, float, str) tuples including notes."""
+    if not FILE_PATH.exists():
+        return []
+    entries = []
+    with FILE_PATH.open(newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            try:
+                entries.append((
+                    date.fromisoformat(row["Date"].strip()),
+                    float(row["Time"].strip()),
+                    row.get("Notes", "").strip(),
                 ))
             except (ValueError, KeyError):
                 pass
@@ -168,6 +196,49 @@ def cmd_graph(args):
     render_graph(days, values, mode.value.upper(), span)
 
 
+def cmd_log(args):
+    count   = getattr(args, OPT_COUNT)
+    entries = read_all_entries_full()
+
+    if not entries:
+        print("No entries found.")
+        return
+
+    # Build rows with running totals
+    running = 0.0
+    rows = []
+    for entry_date, value, note in entries:
+        running += value
+        rows.append((entry_date, value, running, note))
+
+    rows = rows[-count:]
+
+    def fmt(v):
+        return f"{v:.2f}".rstrip("0").rstrip(".")
+
+    RED   = "\033[1;31m"
+    GREEN = "\033[1;32m"
+    DIM   = "\033[2m"
+    RESET = "\033[0m"
+
+    date_w    = 10
+    logged_w  = max(len("Logged"), max(len(fmt(r[1])) for r in rows))
+    total_w   = max(len("Total"),  max(len(fmt(r[2])) for r in rows))
+
+    header = f"{'Date':<{date_w}}  {'Logged':>{logged_w}}  {'Total':>{total_w}}  Note"
+    sep    = f"{'─' * date_w}  {'─' * logged_w}  {'─' * total_w}  {'─' * 4}"
+    print(header)
+    print(sep)
+
+    for entry_date, value, total, note in rows:
+        logged_s = fmt(value)
+        total_s  = fmt(total)
+        logged_col = f"{RED if value < 0 else GREEN}{logged_s:>{logged_w}}{RESET}"
+        total_col  = f"{RED if total  < 0 else GREEN}{total_s:>{total_w}}{RESET}"
+        note_col   = f"{DIM}{note}{RESET}" if note else ""
+        print(f"{entry_date.isoformat():<{date_w}}  {logged_col}  {total_col}  {note_col}")
+
+
 def main():
     args = build_parser().parse_args()
 
@@ -175,6 +246,8 @@ def main():
         cmd_read(args)
     elif args.command == CMD_WRITE:
         cmd_write(args)
+    elif args.command == CMD_LOG:
+        cmd_log(args)
     elif args.command == CMD_GRAPH:
         cmd_graph(args)
 
