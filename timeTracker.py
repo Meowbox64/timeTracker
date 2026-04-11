@@ -249,7 +249,10 @@ def cmd_log(args):
     DIM   = "\033[2m"
     RESET = "\033[0m"
 
-    date_w    = 10
+    def fmt_date(d):
+        return d.strftime("%a, %b %-d")
+
+    date_w    = max(len("Date"), max(len(fmt_date(r[0])) for r in rows))
     logged_w  = max(len("Logged"), max(len(fmt(r[1])) for r in rows))
     total_w   = max(len("Total"),  max(len(fmt(r[2])) for r in rows))
 
@@ -264,7 +267,7 @@ def cmd_log(args):
         logged_col = f"{RED if value < 0 else GREEN}{logged_s:>{logged_w}}{RESET}"
         total_col  = f"{RED if total  < 0 else GREEN}{total_s:>{total_w}}{RESET}"
         note_col   = f"{DIM}{note}{RESET}" if note else ""
-        print(f"{entry_date.isoformat():<{date_w}}  {logged_col}  {total_col}  {note_col}")
+        print(f"{fmt_date(entry_date):<{date_w}}  {logged_col}  {total_col}  {note_col}")
 
 
 def main():

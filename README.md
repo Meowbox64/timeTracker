@@ -1,6 +1,6 @@
 # timeTracker
 
-Track time by logging float values to a CSV file.
+A simple CLI tool for tracking banked time.
 
 ## Recommended Setup
 
@@ -58,6 +58,8 @@ timeTracker.py <command> [options]
 |---|---|
 | `read` | Print the total sum of all logged time |
 | `write <value>` | Log a time value (positive or negative) |
+| `edit <value> [note]` | Overwrite the last log entry |
+| `log [N]` | Show the last N entries as a table (default: 10) |
 | `graph` | Display a bar graph of logged time |
 
 ### `write` options
@@ -82,7 +84,11 @@ python3 timeTracker.py write 1.5                          # log 1.5 today
 python3 timeTracker.py write -0.5 --note="correction"    # subtract with a note
 python3 timeTracker.py write 2 --offset=-1               # log 2 to yesterday
 python3 timeTracker.py write 3 --date=2026-03-28         # log to a specific date
+python3 timeTracker.py edit 1.5                          # fix last entry value
+python3 timeTracker.py edit 1.5 forgot to mention this   # fix value and note
 python3 timeTracker.py read                              # print total
+python3 timeTracker.py log                               # show last 10 entries
+python3 timeTracker.py log 25                            # show last 25 entries
 python3 timeTracker.py graph                             # net total graph, last 30 days
 python3 timeTracker.py graph --mode=log --span=14        # daily graph, last 14 days
 ```
