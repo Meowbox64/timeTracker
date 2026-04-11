@@ -1,5 +1,6 @@
 """Graph rendering for timeTracker."""
 
+import math
 from typing import Sequence
 
 GRAPH_STEP = 0.5
@@ -7,11 +8,13 @@ GRAPH_STEP = 0.5
 LABEL_WIDTH   = 4   # chars reserved for y-axis labels (e.g. " 4.0", "-3.5")
 TICK_INTERVAL = 5   # days between x-axis tick marks
 
-_GREEN_BG = "\033[102m"
-_RED_BG   = "\033[101m"
-_RESET    = "\033[0m"
-_BOLD     = "\033[1m"
-_BLOCK    = " "
+_GREEN      = "\033[92m"
+_RED        = "\033[91m"
+_RESET      = "\033[0m"
+_BOLD       = "\033[1m"
+_FULL_BLOCK = "█"   # U+2588 full cell
+_LOWER_HALF = "▄"   # U+2584 bottom half filled  (positive partial)
+_UPPER_HALF = "▀"   # U+2580 top half filled     (negative partial)
 
 
 def render_graph(days: Sequence, values: Sequence[float], mode_label: str, span: int) -> None:
@@ -26,7 +29,8 @@ def render_graph(days: Sequence, values: Sequence[float], mode_label: str, span:
     snapped = [_snap(v) for v in values]
 
     max_abs   = max((abs(v) for v in snapped), default=0.0)
-    max_abs   = max(GRAPH_STEP, max_abs)   # at least one row above and below zero
+    # Ceil to nearest full step so row boundaries never straddle zero.
+    max_abs   = max(GRAPH_STEP, math.ceil(max_abs / GRAPH_STEP) * GRAPH_STEP)
     num_rows  = round(2 * max_abs / GRAPH_STEP)
     lines     = []
 
@@ -78,8 +82,9 @@ def _content_row(
 # ── cell rendering ───────────────────────────────────────────────────────────
 
 def _snap(value: float) -> float:
-    """Round value to the nearest GRAPH_STEP increment."""
-    return round(value / GRAPH_STEP) * GRAPH_STEP
+    """Round value to the nearest half-step increment."""
+    half = GRAPH_STEP / 2
+    return round(value / half) * half
 
 
 def _fmt_label(value: float) -> str:
@@ -87,13 +92,19 @@ def _fmt_label(value: float) -> str:
 
 
 def _cell_char(value: float, top_val: float, bottom_val: float) -> str:
-    """Return a coloured block if value falls in [bottom_val, top_val], else a space."""
-    if value == 0.0:
+    """Return a coloured block character for this cell, or a space."""
+    if abs(value) < 1e-9:
         return " "
-    if value > 0 and 0 <= bottom_val < value:
-        return f"{_GREEN_BG}{_BLOCK}{_RESET}"
-    if value < 0 and value < top_val <= 0:
-        return f"{_RED_BG}{_BLOCK}{_RESET}"
+    if value > 0 and bottom_val >= -1e-9:          # positive region
+        if value >= top_val - 1e-9:                # row fully within bar
+            return f"{_GREEN}{_FULL_BLOCK}{_RESET}"
+        if value > bottom_val + 1e-9:              # partial row: lower half
+            return f"{_GREEN}{_LOWER_HALF}{_RESET}"
+    elif value < 0 and top_val <= 1e-9:            # negative region
+        if value <= bottom_val + 1e-9:             # row fully within bar
+            return f"{_RED}{_FULL_BLOCK}{_RESET}"
+        if value < top_val - 1e-9:                 # partial row: upper half
+            return f"{_RED}{_UPPER_HALF}{_RESET}"
     return " "
 
 
