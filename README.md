@@ -2,59 +2,61 @@
 
 Track time by logging float values to a CSV file.
 
-## Setup
-
-```bash
-chmod +x timeTracker.sh
-```
-
 ## Usage
 
-**Read** — print the sum of all logged time:
 ```bash
-./timeTracker.sh
+python3 timeTracker.py <command> [options]
 ```
 
-**Write** — log a time value (positive or negative):
-```bash
-./timeTracker.sh <float>
-```
+### Commands
 
-### Options
+| Command | Description |
+|---|---|
+| `read` | Print the total sum of all logged time |
+| `write <value>` | Log a time value (positive or negative) |
+| `graph` | Display a bar graph of logged time |
+
+### `write` options
 
 | Flag | Description |
 |---|---|
 | `--note="..."` | Attach a note to the entry |
 | `--offset=<n>` | Days offset from today (e.g. `-1` for yesterday) |
-| `--date=YYYY-MM-DD` | Log to a specific date |
+| `--date=YYYY-MM-DD` | Log to a specific date (overrides `--offset`) |
+
+### `graph` options
+
+| Flag | Description |
+|---|---|
+| `--mode=net\|log` | `net` = running cumulative total (default); `log` = daily logged amount |
+| `--span=<n>` | Days back to display (default: `30`) |
 
 ## Examples
 
 ```bash
-./timeTracker.sh 1.5                          # log 1.5 today
-./timeTracker.sh -0.5 --note="correction"     # subtract with a note
-./timeTracker.sh 2 --offset=-1                # log 2 to yesterday
-./timeTracker.sh 3 --date=2026-03-28          # log to a specific date
-./timeTracker.sh                              # print total
+python3 timeTracker.py write 1.5                          # log 1.5 today
+python3 timeTracker.py write -0.5 --note="correction"    # subtract with a note
+python3 timeTracker.py write 2 --offset=-1               # log 2 to yesterday
+python3 timeTracker.py write 3 --date=2026-03-28         # log to a specific date
+python3 timeTracker.py read                              # print total
+python3 timeTracker.py graph                             # net total graph, last 30 days
+python3 timeTracker.py graph --mode=log --span=14        # daily graph, last 14 days
 ```
 
-## Configuration
+## Graph
 
-By default the CSV is created in the same directory as the script. If you invoke `timeTracker.sh` from elsewhere in the system (e.g. via a shell alias or `$PATH`), make CSV_PATH an absolute path so the file is always written to the same place:
+The graph renders a vertical bar chart in the terminal. Positive values (green) stack upward; negative values (red) stack downward.
 
-```bash
-CSV_FILE="$HOME/timeTracker/timeTracker.csv"
-```
+Values are resolved to 0.25-hour precision (half of the 0.5-hour step size). Each row represents 0.5 hours:
 
-If the directory doesn't exist yet, add this line directly below:
-
-```bash
-mkdir -p "$(dirname "$CSV_FILE")"
-```
+- A full-height bar uses a solid block character (`█`)
+- A partial bar (0.25 h into a 0.5 h row) uses a half-block character:
+  - Positive: `▄` (lower half) — sits atop the full block below
+  - Negative: `▀` (upper half) — hangs below the full block above
 
 ## Data
 
-Entries are stored in `timeTracker.csv` (created automatically):
+Entries are stored in `~/timeTracker/log.csv` (created automatically):
 
 ```
 Date,Time,Notes
