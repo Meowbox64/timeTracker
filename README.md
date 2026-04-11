@@ -2,12 +2,6 @@
 
 Track time by logging float values to a CSV file.
 
-## Usage
-
-```bash
-timeTracker.py <command> [options]
-```
-
 ## Recommended Setup
 
 **1. Make the script executable:**
@@ -50,6 +44,12 @@ Or with the alias:
 ```bash
 timetracker write 1.5
 timetracker graph
+```
+
+## Usage
+
+```bash
+timeTracker.py <command> [options]
 ```
 
 ### Commands
