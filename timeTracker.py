@@ -16,6 +16,7 @@ CMD_READ  = "read"
 CMD_WRITE = "write"
 CMD_GRAPH = "graph"
 CMD_LOG   = "log"
+CMD_EDIT  = "edit"
 
 OPT_VALUE  = "value"
 OPT_OFFSET = "offset"
@@ -56,6 +57,10 @@ def build_parser():
     write_cmd.add_argument(f"--{OPT_DATE}", default=None, metavar="YYYY-MM-DD",
                            help="Explicit date (overrides --offset)")
     write_cmd.add_argument(f"--{OPT_NOTE}", default="", help="Optional note for this entry")
+
+    edit_cmd = subparsers.add_parser(CMD_EDIT, help="Edit the last log entry")
+    edit_cmd.add_argument(OPT_VALUE, type=float, help="New time value")
+    edit_cmd.add_argument(OPT_NOTE, nargs="*", help="New note (optional; words need not be quoted)")
 
     log_cmd = subparsers.add_parser(CMD_LOG, help="Display recent entries as a table")
     log_cmd.add_argument(
@@ -196,6 +201,29 @@ def cmd_graph(args):
     render_graph(days, values, mode.value.upper(), span)
 
 
+def edit_last_entry(value, note):
+    if not FILE_PATH.exists():
+        sys.exit("Error: no log file found.")
+    with FILE_PATH.open(newline="") as f:
+        rows = list(csv.DictReader(f))
+    if not rows:
+        sys.exit("Error: log is empty.")
+    rows[-1]["Time"]  = value
+    rows[-1]["Notes"] = note
+    with FILE_PATH.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=HEADER)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def cmd_edit(args):
+    value = getattr(args, OPT_VALUE)
+    note  = " ".join(getattr(args, OPT_NOTE))
+    edit_last_entry(value, note)
+    note_part = f', "{note}"' if note else ""
+    print(f"Updated last entry: {value}{note_part}")
+
+
 def cmd_log(args):
     count   = getattr(args, OPT_COUNT)
     entries = read_all_entries_full()
@@ -246,6 +274,8 @@ def main():
         cmd_read(args)
     elif args.command == CMD_WRITE:
         cmd_write(args)
+    elif args.command == CMD_EDIT:
+        cmd_edit(args)
     elif args.command == CMD_LOG:
         cmd_log(args)
     elif args.command == CMD_GRAPH:
