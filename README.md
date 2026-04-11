@@ -5,7 +5,51 @@ Track time by logging float values to a CSV file.
 ## Usage
 
 ```bash
-python3 timeTracker.py <command> [options]
+timeTracker.py <command> [options]
+```
+
+## Recommended Setup
+
+**1. Make the script executable:**
+
+```bash
+chmod +x {path-to-timeTracker}/timeTracker/timeTracker.py
+```
+
+**2. Add to PATH** so you can run `timeTracker.py` from any directory.
+
+Add this line to your `~/.bashrc` or `~/.zshrc`:
+
+```bash
+export PATH="{path-to-timeTracker}/timeTracker:$PATH"
+```
+
+Then reload your shell:
+
+```bash
+source ~/.bashrc   # or source ~/.zshrc
+```
+
+**3. Optional — create a shorter alias:**
+
+Add to the same shell config file to avoid typing the `.py` extension:
+
+```bash
+alias tt="timeTracker.py"
+```
+
+After setup you can run from anywhere:
+
+```bash
+timeTracker.py write 1.5
+timeTracker.py graph
+```
+
+Or with the alias:
+
+```bash
+timetracker write 1.5
+timetracker graph
 ```
 
 ### Commands
@@ -42,17 +86,6 @@ python3 timeTracker.py read                              # print total
 python3 timeTracker.py graph                             # net total graph, last 30 days
 python3 timeTracker.py graph --mode=log --span=14        # daily graph, last 14 days
 ```
-
-## Graph
-
-The graph renders a vertical bar chart in the terminal. Positive values (green) stack upward; negative values (red) stack downward.
-
-Values are resolved to 0.25-hour precision (half of the 0.5-hour step size). Each row represents 0.5 hours:
-
-- A full-height bar uses a solid block character (`█`)
-- A partial bar (0.25 h into a 0.5 h row) uses a half-block character:
-  - Positive: `▄` (lower half) — sits atop the full block below
-  - Negative: `▀` (upper half) — hangs below the full block above
 
 ## Data
 
