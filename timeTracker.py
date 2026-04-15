@@ -56,7 +56,7 @@ def build_parser():
                            help="Day offset from today (e.g. -1 for yesterday)")
     write_cmd.add_argument(f"--{OPT_DATE}", default=None, metavar="YYYY-MM-DD",
                            help="Explicit date (overrides --offset)")
-    write_cmd.add_argument(f"--{OPT_NOTE}", default="", help="Optional note for this entry")
+    write_cmd.add_argument(OPT_NOTE, nargs="*", help="Optional note (words need not be quoted)")
 
     edit_cmd = subparsers.add_parser(CMD_EDIT, help="Edit the last log entry")
     edit_cmd.add_argument(OPT_VALUE, type=float, help="New time value")
@@ -182,7 +182,7 @@ def cmd_read(_args):
 
 def cmd_write(args):
     resolved = resolve_date(getattr(args, OPT_DATE), getattr(args, OPT_OFFSET))
-    note = getattr(args, OPT_NOTE)
+    note = " ".join(getattr(args, OPT_NOTE))
     append_entry(resolved, getattr(args, OPT_VALUE), note)
     note_part = f', "{note}"' if note else ""
     print(f"Written: {resolved.isoformat()}, {getattr(args, OPT_VALUE)}{note_part}")
