@@ -5,13 +5,15 @@ from typing import Sequence
 
 GRAPH_STEP = 0.5
 
-LABEL_WIDTH   = 4   # chars reserved for y-axis labels (e.g. " 4.0", "-3.5")
+LABEL_WIDTH   = 5   # chars reserved for y-axis labels + tick (e.g. " 4.0▔", "-3.5▁")
 TICK_INTERVAL = 5   # days between x-axis tick marks
 
 _GREEN      = "\033[92m"
 _RED        = "\033[91m"
 _RESET      = "\033[0m"
 _BOLD       = "\033[1m"
+_GREY       = "\033[90m"
+_DIM_GREEN  = "\033[2;32m"
 _FULL_BLOCK = "█"   # U+2588 full cell
 _LOWER_HALF = "▄"   # U+2584 bottom half filled  (positive partial)
 _UPPER_HALF = "▀"   # U+2580 top half filled     (negative partial)
@@ -55,7 +57,7 @@ def render_graph(days: Sequence, values: Sequence[float], mode_label: str, span:
         suffix = (gap + side[text_idx]) if 0 <= text_idx < len(side) else ""
         out.append(line + suffix)
 
-    print("\n".join(out))
+    print("\n".join("  " + line for line in out))
 
 
 # ── row builders ────────────────────────────────────────────────────────────
@@ -88,11 +90,14 @@ def _snap(value: float) -> float:
 
 
 def _fmt_label(value: float) -> str:
-    return f"{value:4.1f}"
+    tick = "▔" if value > 0 else "▁"
+    return f"{_GREY}{value:4.1f}{tick}{_RESET}"
 
 
 def _cell_char(value: float, top_val: float, bottom_val: float) -> str:
     """Return a coloured block character for this cell, or a space."""
+    if abs(top_val) < 1e-9 and value >= -1e-9:
+        return f"{_GREY}▔{_RESET}"
     if abs(value) < 1e-9:
         return " "
     if value > 0 and bottom_val >= -1e-9:          # positive region
@@ -131,8 +136,8 @@ def _x_axis(span: int) -> list:
 
     pad = " " * (LABEL_WIDTH + 1)        # align with inner graph content
     return [
-        pad + "".join(tick_chars),
-        pad + "".join(label_chars),
+        _GREY + pad + "".join(tick_chars) + _RESET,
+        _GREY + pad + "".join(label_chars) + _RESET,
     ]
 
 

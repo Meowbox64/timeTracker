@@ -8,15 +8,16 @@ from enum import Enum
 from pathlib import Path
 
 FILE_PATH = Path.home() / "timeTracker" / "log.csv"
-HEADER = ["Date", "Time", "Notes"]
+HEADER = ["ID", "Date", "Time", "Notes"]
 
 PROG_NAME = "timeTracker"
 
-CMD_READ  = "read"
-CMD_WRITE = "write"
-CMD_GRAPH = "graph"
-CMD_LOG   = "log"
-CMD_EDIT  = "edit"
+CMD_READ   = "read"
+CMD_WRITE  = "write"
+CMD_GRAPH  = "graph"
+CMD_LOG    = "log"
+CMD_EDIT   = "edit"
+CMD_DELETE = "delete"
 
 OPT_VALUE  = "value"
 OPT_OFFSET = "offset"
@@ -25,6 +26,7 @@ OPT_NOTE   = "note"
 OPT_MODE   = "mode"
 OPT_SPAN   = "span"
 OPT_COUNT  = "count"
+OPT_ID     = "id"
 
 
 class GraphMode(Enum):
@@ -58,9 +60,14 @@ def build_parser():
                            help="Explicit date (overrides --offset)")
     write_cmd.add_argument(OPT_NOTE, nargs="*", help="Optional note (words need not be quoted)")
 
+    delete_cmd = subparsers.add_parser(CMD_DELETE, help="Delete a log entry")
+    delete_cmd.add_argument(OPT_ID, type=int, nargs="?", default=None,
+                            help="ID of entry to delete (default: last entry)")
+
     edit_cmd = subparsers.add_parser(CMD_EDIT, help="Edit the last log entry")
     edit_cmd.add_argument(OPT_VALUE, type=float, help="New time value")
     edit_cmd.add_argument(OPT_NOTE, nargs="*", help="New note (optional; words need not be quoted)")
+    edit_cmd.add_argument(f"--{OPT_ID}", type=int, default=None, help="ID of entry to edit (default: last entry)")
 
     log_cmd = subparsers.add_parser(CMD_LOG, help="Display recent entries as a table")
     log_cmd.add_argument(
@@ -70,17 +77,18 @@ def build_parser():
 
     graph_cmd = subparsers.add_parser(CMD_GRAPH, help="Display a bar graph of logged time")
     graph_cmd.add_argument(
+        OPT_SPAN,
+        type=int,
+        nargs="?",
+        default=DEFAULT_GRAPH_SPAN,
+        metavar="DAYS",
+        help=f"Days back to display (default: {DEFAULT_GRAPH_SPAN})",
+    )
+    graph_cmd.add_argument(
         f"--{OPT_MODE}",
         choices=[m.value for m in GraphMode],
         default=DEFAULT_GRAPH_MODE.value,
         help=f"Graph mode (default: {DEFAULT_GRAPH_MODE.value})",
-    )
-    graph_cmd.add_argument(
-        f"--{OPT_SPAN}",
-        type=int,
-        default=DEFAULT_GRAPH_SPAN,
-        metavar="DAYS",
-        help=f"Days back to display (default: {DEFAULT_GRAPH_SPAN})",
     )
 
     return parser
@@ -120,7 +128,7 @@ def read_all_entries():
 
 
 def read_all_entries_full():
-    """Return all log entries as a list of (date, float, str) tuples including notes."""
+    """Return all log entries as a list of (date, float, str, int) tuples including notes and ID."""
     if not FILE_PATH.exists():
         return []
     entries = []
@@ -132,6 +140,7 @@ def read_all_entries_full():
                     date.fromisoformat(row["Date"].strip()),
                     float(row["Time"].strip()),
                     row.get("Notes", "").strip(),
+                    int(row["ID"].strip()),
                 ))
             except (ValueError, KeyError):
                 pass
@@ -149,10 +158,24 @@ def resolve_date(date_str, offset):
     return date.today()
 
 
+def next_id():
+    if not FILE_PATH.exists():
+        return 1
+    with FILE_PATH.open(newline="") as f:
+        rows = list(csv.DictReader(f))
+    if not rows:
+        return 1
+    try:
+        return int(rows[-1]["ID"]) + 1
+    except (ValueError, KeyError):
+        return len(rows) + 1
+
+
 def append_entry(entry_date, value, note):
     ensure_file()
+    new_id = next_id()
     with FILE_PATH.open("a", newline="") as f:
-        csv.writer(f).writerow([entry_date.isoformat(), value, note or ""])
+        csv.writer(f).writerow([new_id, entry_date.isoformat(), value, note or ""])
 
 
 def compute_daily_values(entries, days, mode):
@@ -177,7 +200,9 @@ def cmd_read(_args):
     total = sum_logged_time()
     formatted = f"{total:.2f}".rstrip("0").rstrip(".")
     color = "\033[1;31m" if total < 0 else "\033[1;32m"
-    print(f"{color}{formatted}\033[0m")
+    WHITE = "\033[0;37m"
+    RESET = "\033[0m"
+    print(f"  {WHITE}net time: {color}{formatted}{WHITE} hours{RESET}")
 
 
 def cmd_write(args):
@@ -185,7 +210,7 @@ def cmd_write(args):
     note = " ".join(getattr(args, OPT_NOTE))
     append_entry(resolved, getattr(args, OPT_VALUE), note)
     note_part = f', "{note}"' if note else ""
-    print(f"Written: {resolved.isoformat()}, {getattr(args, OPT_VALUE)}{note_part}")
+    print(f"  Written: {resolved.isoformat()}, {getattr(args, OPT_VALUE)}{note_part}")
 
 
 def cmd_graph(args):
@@ -201,27 +226,68 @@ def cmd_graph(args):
     render_graph(days, values, mode.value.upper(), span)
 
 
-def edit_last_entry(value, note):
+def edit_entry(value, note, target_id=None):
     if not FILE_PATH.exists():
         sys.exit("Error: no log file found.")
     with FILE_PATH.open(newline="") as f:
         rows = list(csv.DictReader(f))
     if not rows:
         sys.exit("Error: log is empty.")
-    rows[-1]["Time"]  = value
-    rows[-1]["Notes"] = note
+    if target_id is None:
+        row = rows[-1]
+    else:
+        for row in rows:
+            if int(row["ID"]) == target_id:
+                break
+        else:
+            sys.exit(f"Error: no entry with ID {target_id}.")
+    row["Time"] = value
+    if note is not None:
+        row["Notes"] = note
+    with FILE_PATH.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=HEADER)
+        writer.writeheader()
+        writer.writerows(rows)
+    return row
+
+
+def cmd_edit(args):
+    value     = getattr(args, OPT_VALUE)
+    raw_note  = getattr(args, OPT_NOTE)
+    note      = " ".join(raw_note) if raw_note else None
+    target_id = getattr(args, OPT_ID)
+    row       = edit_entry(value, note, target_id)
+    display_note = note if note is not None else row.get("Notes", "")
+    note_part = f', "{display_note}"' if display_note else ""
+    print(f"  Updated [{row['ID']}] {row['Date']}: {value}{note_part}")
+
+
+def cmd_delete(args):
+    if not FILE_PATH.exists():
+        sys.exit("Error: no log file found.")
+    with FILE_PATH.open(newline="") as f:
+        rows = list(csv.DictReader(f))
+    if not rows:
+        sys.exit("Error: log is empty.")
+
+    target_id = getattr(args, OPT_ID)
+    if target_id is None:
+        removed = rows.pop()
+    else:
+        for i, row in enumerate(rows):
+            if int(row["ID"]) == target_id:
+                removed = rows.pop(i)
+                break
+        else:
+            sys.exit(f"Error: no entry with ID {target_id}.")
+
     with FILE_PATH.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=HEADER)
         writer.writeheader()
         writer.writerows(rows)
 
-
-def cmd_edit(args):
-    value = getattr(args, OPT_VALUE)
-    note  = " ".join(getattr(args, OPT_NOTE))
-    edit_last_entry(value, note)
-    note_part = f', "{note}"' if note else ""
-    print(f"Updated last entry: {value}{note_part}")
+    note_part = f', "{removed["Notes"]}"' if removed["Notes"] else ""
+    print(f"  Deleted: [{removed['ID']}] {removed['Date']}, {removed['Time']}{note_part}")
 
 
 def cmd_log(args):
@@ -229,15 +295,15 @@ def cmd_log(args):
     entries = read_all_entries_full()
 
     if not entries:
-        print("No entries found.")
+        print("  No entries found.")
         return
 
     # Build rows with running totals
     running = 0.0
     rows = []
-    for entry_date, value, note in entries:
+    for entry_date, value, note, entry_id in entries:
         running += value
-        rows.append((entry_date, value, running, note))
+        rows.append((entry_date, value, running, note, entry_id))
 
     rows = rows[-count:]
 
@@ -252,22 +318,23 @@ def cmd_log(args):
     def fmt_date(d):
         return d.strftime("%a, %b %-d")
 
+    id_w      = max(len("ID"),   max(len(str(r[4])) for r in rows))
     date_w    = max(len("Date"), max(len(fmt_date(r[0])) for r in rows))
     logged_w  = max(len("Logged"), max(len(fmt(r[1])) for r in rows))
     total_w   = max(len("Total"),  max(len(fmt(r[2])) for r in rows))
 
-    header = f"{'Date':<{date_w}}  {'Logged':>{logged_w}}  {'Total':>{total_w}}  Note"
-    sep    = f"{'─' * date_w}  {'─' * logged_w}  {'─' * total_w}  {'─' * 4}"
-    print(header)
-    print(sep)
+    header = f"{'ID':>{id_w}}  {'Date':<{date_w}}  {'Logged':>{logged_w}}  {'Total':>{total_w}}  Note"
+    sep    = f"{'─' * id_w}  {'─' * date_w}  {'─' * logged_w}  {'─' * total_w}  {'─' * 4}"
+    print(f"  {header}")
+    print(f"  {sep}")
 
-    for entry_date, value, total, note in rows:
+    for entry_date, value, total, note, entry_id in rows:
         logged_s = fmt(value)
         total_s  = fmt(total)
         logged_col = f"{RED if value < 0 else GREEN}{logged_s:>{logged_w}}{RESET}"
         total_col  = f"{RED if total  < 0 else GREEN}{total_s:>{total_w}}{RESET}"
         note_col   = f"{DIM}{note}{RESET}" if note else ""
-        print(f"{fmt_date(entry_date):<{date_w}}  {logged_col}  {total_col}  {note_col}")
+        print(f"  {entry_id:>{id_w}}  {fmt_date(entry_date):<{date_w}}  {logged_col}  {total_col}  {note_col}")
 
 
 def main():
@@ -283,6 +350,8 @@ def main():
         cmd_log(args)
     elif args.command == CMD_GRAPH:
         cmd_graph(args)
+    elif args.command == CMD_DELETE:
+        cmd_delete(args)
 
 
 if __name__ == "__main__":
