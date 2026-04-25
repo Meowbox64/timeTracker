@@ -2,6 +2,9 @@
 
 A simple CLI tool for tracking banked time.
 
+<img width="800" height="319" alt="timeTracker_example" src="https://github.com/user-attachments/assets/361acb04-a1c1-4b82-bb3d-6f559e99d1d5" />
+
+
 ## Recommended Setup
 
 **1. Make the script executable:**
