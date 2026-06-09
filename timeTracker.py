@@ -211,6 +211,7 @@ def cmd_write(args):
     append_entry(resolved, getattr(args, OPT_VALUE), note)
     note_part = f', "{note}"' if note else ""
     print(f"  Written: {resolved.isoformat()}, {getattr(args, OPT_VALUE)}{note_part}")
+    cmd_read(args)
 
 
 def cmd_graph(args):
@@ -260,6 +261,7 @@ def cmd_edit(args):
     display_note = note if note is not None else row.get("Notes", "")
     note_part = f', "{display_note}"' if display_note else ""
     print(f"  Updated [{row['ID']}] {row['Date']}: {value}{note_part}")
+    cmd_read(args)
 
 
 def cmd_delete(args):
